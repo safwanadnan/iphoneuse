@@ -138,6 +138,7 @@ The `screen` tool returns a JPEG at point resolution together with the numbered 
 
 - A Mac with Xcode is required, for signing and for running XCUITest.
 - With a free Apple ID: 7-day signatures (handled automatically), at most 3 sideloaded apps per phone, and 10 new app IDs per week (iadb uses one).
+- The phone must be unlocked when the helper starts. While automating, set Settings → Display & Brightness → Auto-Lock → Never.
 - The helper can't unlock the phone or enter the passcode, and some system screens (passcode, Apple Pay, parts of Settings) refuse automation.
 - `open <url>` needs iOS 16.4+. Volume keys don't exist on simulators.
 

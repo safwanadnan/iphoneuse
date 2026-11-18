@@ -112,7 +112,7 @@ func Diagnose(output string) string {
 	case strings.Contains(lower, "developer mode disabled") || strings.Contains(lower, "developer mode is disabled"):
 		return "Developer Mode is off. On your iPhone open Settings → Privacy & Security → Developer Mode, turn it on, and restart the phone."
 	case strings.Contains(lower, "is locked") || strings.Contains(lower, "passcode protected"):
-		return "Your iPhone is locked. Unlock it and keep it unlocked while iadb starts."
+		return "NEEDS_UNLOCK: Unlock your iPhone and keep it unlocked while the helper starts."
 	case strings.Contains(lower, "is not available because it is unpaired") || strings.Contains(lower, "not paired"):
 		return "This Mac is not trusted by the phone. Unlock it and tap Trust on the \"Trust This Computer?\" prompt."
 	case strings.Contains(lower, "ios") && strings.Contains(lower, "is not installed") ||
@@ -242,7 +242,7 @@ func RunnerCommand(ctx context.Context, dev *config.Device) (*exec.Cmd, error) {
 		"test-without-building",
 		"-xctestrun", path,
 		"-destination", "id="+dev.UDID,
-		"-only-testing:IADBRunner/IADBRunner/testRun",
+		"-only-testing:IADBRunner/IADBRunner/testServe",
 	)
 	return cmd, nil
 }

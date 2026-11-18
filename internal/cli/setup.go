@@ -72,6 +72,9 @@ func cmdSetup(a args) error {
 	// Stop an old helper so the new build can replace it.
 	runner.New(dev).Shutdown()
 
+	// Stop the daemon during the build so an older iadb can't race us.
+	daemon.Stop()
+
 	step("Building and signing the helper (the first build takes 1–3 minutes)")
 	start := time.Now()
 	stopTicker := ticker(start)
@@ -96,14 +99,15 @@ func cmdSetup(a args) error {
 
 	step("Starting the helper")
 	if !a.bool("no-service") && !service.Installed() {
-		daemon.Stop()
 		if err := service.Install(); err != nil {
 			warn("Could not install the login service (%v); using a background daemon instead", err)
 		} else {
 			ok("Installed the login service: iadb keeps the helper running and re-signs it automatically")
 		}
 	}
-	if !service.Installed() {
+	if service.Installed() {
+		service.Install() // reload so launchd runs this binary
+	} else {
 		if err := daemon.Spawn(); err != nil {
 			return err
 		}

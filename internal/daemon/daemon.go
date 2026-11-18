@@ -142,6 +142,9 @@ func Run() error {
 		nextTry:  map[string]time.Time{},
 		status:   config.LoadStatus(),
 	}
+	exe, _ := os.Executable()
+	startInfo, _ := os.Stat(exe)
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
 	ticker := time.NewTicker(3 * time.Second)
@@ -157,6 +160,17 @@ func Run() error {
 			config.SaveStatus(d.status)
 			return nil
 		case <-ticker.C:
+			// If iadb was upgraded, this process is running old code that would
+			// fight the new version (e.g. rebuild the helper from stale source).
+			// Exit so launchd, or the next command, starts the new binary.
+			if info, err := os.Stat(exe); err == nil && startInfo != nil && !info.ModTime().Equal(startInfo.ModTime()) {
+				log.Printf("iadb binary changed on disk; restarting")
+				for udid := range d.procs {
+					d.stop(udid, "restarting")
+				}
+				config.SaveStatus(d.status)
+				return nil
+			}
 			d.tick()
 		}
 	}
@@ -291,11 +305,15 @@ func (d *daemon) start(dev *config.Device) {
 		return
 	}
 	logPath := filepath.Join(config.LogDir(), "helper-"+dev.UDID+".log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if info, err := os.Stat(logPath); err == nil && info.Size() > 5<<20 {
+		os.Rename(logPath, logPath+".1")
+	}
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		d.setStatus(dev.UDID, "error", err.Error(), 0)
 		return
 	}
+	fmt.Fprintf(logFile, "\n===== %s starting helper =====\n", time.Now().Format(time.RFC3339))
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
 	cmd.Stderr = pw
@@ -360,9 +378,12 @@ func (d *daemon) exited(udid string, proc *helperProc) {
 	}
 	log.Printf("%s: %s", udid, msg)
 	state := "error"
-	if strings.HasPrefix(msg, "NEEDS_TRUST") {
+	if strings.HasPrefix(msg, "NEEDS_TRUST") || strings.HasPrefix(msg, "NEEDS_UNLOCK") {
 		state = "needs-trust"
-		msg = strings.TrimPrefix(msg, "NEEDS_TRUST: ")
+		if strings.HasPrefix(msg, "NEEDS_UNLOCK") {
+			state = "needs-unlock"
+		}
+		msg = msg[strings.Index(msg, ": ")+2:]
 		d.nextTry[udid] = time.Now().Add(5 * time.Second)
 		d.setStatus(udid, state, msg, 0)
 		return

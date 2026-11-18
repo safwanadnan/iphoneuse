@@ -79,7 +79,7 @@ final class HTTPServer {
   }
 
   func start() {
-    listener.stateUpdateHandler = { state in NSLog("iadb: listener \(state)") }
+    listener.stateUpdateHandler = { state in log("listener \(state)") }
     listener.newConnectionHandler = { [weak self] connection in
       guard let self else { return }
       connection.start(queue: self.queue)

@@ -6,21 +6,41 @@ import UIKit
 final class IADBRunner: XCTestCase {
   static let helperVersion = "1.0.0"
 
-  func testRun() throws {
+  // Not called `testRun`: XCTest already has a `testRun` property, and
+  // `-only-testing:…/testRun` would silently call that getter instead.
+  func testServe() {
+    log("helper starting")
     continueAfterFailure = true
     executionTimeAllowance = 60 * 60 * 24 * 365
     let env = ProcessInfo.processInfo.environment
     let port = UInt16(env["IADB_PORT"] ?? "") ?? 47100
     let router = Router()
-    let server = try HTTPServer(port: port, handler: router.handle)
+    let server: HTTPServer
+    do {
+      server = try HTTPServer(port: port, handler: router.handle)
+    } catch {
+      XCTFail("iadb: could not listen on port \(port): \(error)")
+      return
+    }
     server.start()
-    NSLog("IADB_READY port=\(port) version=\(IADBRunner.helperVersion)")
+    log("IADB_READY port=\(port) version=\(IADBRunner.helperVersion)")
     while !router.shouldStop {
       autoreleasepool {
         _ = RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.5))
       }
     }
-    NSLog("IADB_STOPPED")
+    log("IADB_STOPPED")
+  }
+}
+
+/// Writes to stderr, which xcodebuild captures (NSLog goes to the unified log only).
+func log(_ message: String) {
+  FileHandle.standardError.write(Data("iadb: \(message)\n".utf8))
+  // Activity names are always echoed by xcodebuild ("t = 0.01s iadb: …"),
+  // unlike stderr from the device, so they double as a reliable log.
+  // XCTContext only works on the main thread.
+  if Thread.isMainThread {
+    XCTContext.runActivity(named: "iadb: \(message)") { _ in }
   }
 }
 
@@ -46,6 +66,7 @@ final class Router {
       case ("POST", "/terminate"): return terminate(body)
       case ("POST", "/open"): return open(body)
       case ("POST", "/shutdown"):
+        log("shutdown requested")
         shouldStop = true
         return .json(["ok": true])
       default:
@@ -162,10 +183,13 @@ final class Router {
 
   // MARK: - Accessibility tree
 
+  /// Types worth listing even without any text (you can still tap them).
+  /// Unlabeled images, icons and cells are left out: they are usually
+  /// decoration or a wrapper around a labeled button with the same frame.
   private static let interactiveTypes: Set<XCUIElement.ElementType> = [
     .button, .textField, .secureTextField, .searchField, .textView, .switch, .toggle, .slider,
-    .stepper, .link, .cell, .tab, .segmentedControl, .picker, .pickerWheel, .menuItem, .key,
-    .image, .icon, .checkBox, .radioButton, .datePicker, .pageIndicator, .alert,
+    .stepper, .link, .tab, .segmentedControl, .picker, .pickerWheel, .menuItem, .key,
+    .checkBox, .radioButton, .datePicker, .pageIndicator, .alert,
   ]
 
   private func tree(_ query: [String: String]) throws -> HTTPResponse {

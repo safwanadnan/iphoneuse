@@ -128,7 +128,7 @@ func checkConfigured(udid string, dev *config.Device, status map[string]config.S
 		if st.Message != "" {
 			msg += ": " + strings.TrimSpace(st.Message)
 		}
-		if st.State == "error" || st.State == "needs-trust" {
+		if st.State == "error" || st.State == "needs-trust" || st.State == "needs-unlock" {
 			bad("    helper %s", msg)
 		} else {
 			ok("    helper %s", msg)

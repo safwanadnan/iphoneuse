@@ -131,7 +131,7 @@ func Connect(selector string, wait time.Duration, logf func(string, ...any)) (*r
 		}
 		st := config.LoadStatus()[dev.UDID]
 		switch st.State {
-		case "needs-trust":
+		case "needs-trust", "needs-unlock":
 			if st.Message != lastMsg && logf != nil {
 				logf("Waiting for you: %s", st.Message)
 				lastMsg = st.Message
