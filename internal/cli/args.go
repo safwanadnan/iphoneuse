@@ -7,7 +7,7 @@ import (
 )
 
 // args is a tiny parser that lets flags appear anywhere, adb-style:
-// `iadb -s phone tap 10 20` and `iadb tap 10 20 -s phone` both work.
+// `iphoneuse -s phone tap 10 20` and `iphoneuse tap 10 20 -s phone` both work.
 type args struct {
 	pos   []string
 	flags map[string]string

@@ -33,7 +33,7 @@ func DeveloperDir() (string, error) {
 			return dir, nil
 		}
 	}
-	return "", errors.New("Xcode is not installed. Install it from the App Store (https://apps.apple.com/app/xcode/id497799835), open it once, then run `iadb setup` again")
+	return "", errors.New("Xcode is not installed. Install it from the App Store (https://apps.apple.com/app/xcode/id497799835), open it once, then run `iphoneuse setup` again")
 }
 
 // Env returns the environment for Xcode subprocesses.
@@ -75,7 +75,7 @@ func Run(timeout time.Duration, tool string, args ...string) ([]byte, error) {
 
 // RunJSON runs a devicectl-style command that writes JSON to --json-output.
 func RunJSON(timeout time.Duration, tool string, args ...string) ([]byte, error) {
-	f, err := os.CreateTemp("", "iadb-*.json")
+	f, err := os.CreateTemp("", "iphoneuse-*.json")
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func RunJSON(timeout time.Duration, tool string, args ...string) ([]byte, error)
 	return os.ReadFile(path)
 }
 
-// Check reports problems that stop iadb from working: missing Xcode,
+// Check reports problems that stop iphoneuse from working: missing Xcode,
 // unaccepted license, or missing iOS platform.
 func Check() []string {
 	var problems []string

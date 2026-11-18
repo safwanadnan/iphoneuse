@@ -2,7 +2,7 @@ import Foundation
 import Network
 
 /// A tiny HTTP/1.1 server (one request per connection) on Network.framework.
-/// iadb reaches it over USB through usbmuxd, or on localhost for simulators.
+/// iphoneuse reaches it over USB through usbmuxd, or on localhost for simulators.
 struct HTTPRequest {
   let method: String
   let path: String
@@ -67,13 +67,13 @@ struct HTTPResponse {
 
 final class HTTPServer {
   private let listener: NWListener
-  private let queue = DispatchQueue(label: "dev.iadb.http")
+  private let queue = DispatchQueue(label: "dev.iphoneuse.http")
   private let handler: (HTTPRequest) -> HTTPResponse
 
   init(port: UInt16, handler: @escaping (HTTPRequest) -> HTTPResponse) throws {
     let params = NWParameters.tcp
     params.allowLocalEndpointReuse = true
-    guard let nwPort = NWEndpoint.Port(rawValue: port) else { throw NSError(domain: "iadb", code: 1) }
+    guard let nwPort = NWEndpoint.Port(rawValue: port) else { throw NSError(domain: "iphoneuse", code: 1) }
     listener = try NWListener(using: params, on: nwPort)
     self.handler = handler
   }

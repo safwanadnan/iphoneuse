@@ -1,4 +1,4 @@
-// Package cli implements the iadb command line.
+// Package cli implements the iphoneuse command line.
 package cli
 
 import (
@@ -12,58 +12,59 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/iadb-dev/iadb/internal/config"
-	"github.com/iadb-dev/iadb/internal/daemon"
-	"github.com/iadb-dev/iadb/internal/device"
-	"github.com/iadb-dev/iadb/internal/mcp"
-	"github.com/iadb-dev/iadb/internal/runner"
-	"github.com/iadb-dev/iadb/internal/service"
-	"github.com/iadb-dev/iadb/internal/session"
+	"github.com/safwanadnan/iphoneuse/internal/config"
+	"github.com/safwanadnan/iphoneuse/internal/daemon"
+	"github.com/safwanadnan/iphoneuse/internal/device"
+	"github.com/safwanadnan/iphoneuse/internal/mcp"
+	"github.com/safwanadnan/iphoneuse/internal/runner"
+	"github.com/safwanadnan/iphoneuse/internal/service"
+	"github.com/safwanadnan/iphoneuse/internal/session"
 )
 
 // Version is set at build time.
 var Version = "dev"
 
-const usage = `iadb — adb for iPhone. Control a real iPhone (or iOS Simulator) from your Mac.
+const usage = `iPhoneUse — computer use, for your iPhone. Let AI agents (and you) control a real iPhone from your Mac.
 
 Setup
-  iadb setup                 Set up the connected iPhone (build, sign and install the helper)
-  iadb doctor                Check Xcode, signing, devices and the helper
-  iadb devices               List iPhones and booted simulators
+  iphoneuse setup                 Set up the connected iPhone (build, sign and install the helper)
+  iphoneuse doctor                Check Xcode, signing, devices and the helper
+  iphoneuse devices               List iPhones and booted simulators
 
 Screen
-  iadb screenshot [-o file]  Save a screenshot (PNG; --jpeg, --scale 0.5|points, -o - for stdout)
-  iadb tree [--json]         List on-screen elements: [ref] Type "label" @(x,y)
-  iadb app                   Show the foreground app
-  iadb wait <text>           Wait until text appears on screen (--timeout 10)
+  iphoneuse screenshot [-o file]  Save a screenshot (PNG; --jpeg, --scale 0.5|points, -o - for stdout)
+  iphoneuse tree [--json]         List on-screen elements: [ref] Type "label" @(x,y)
+  iphoneuse app                   Show the foreground app
+  iphoneuse wait <text>           Wait until text appears on screen (--timeout 10)
 
 Input
-  iadb tap <x> <y>           Tap at points (also: tap <text>, tap --ref 3, --long, --double)
-  iadb swipe <up|down|left|right> | <x1> <y1> <x2> <y2> [--duration 0.3]
-  iadb type <text>           Type into the focused field
-  iadb key <name>            home, lock, volume-up, volume-down, return, delete, tab, escape
+  iphoneuse tap <x> <y>           Tap at points (also: tap <text>, tap --ref 3, --long, --double)
+  iphoneuse swipe <up|down|left|right> | <x1> <y1> <x2> <y2> [--duration 0.3]
+  iphoneuse type <text>           Type into the focused field
+  iphoneuse key <name>            home, lock, volume-up, volume-down, return, delete, tab, escape
 
 Apps
-  iadb launch <bundle-id>    Open an app (--restart to relaunch)
-  iadb kill <bundle-id>      Force-quit an app
-  iadb open <url>            Open a URL or deep link
-  iadb apps                  List installed apps
-  iadb install <path>        Install an .app or .ipa
-  iadb uninstall <bundle-id> Remove an app
+  iphoneuse launch <bundle-id>    Open an app (--restart to relaunch)
+  iphoneuse kill <bundle-id>      Force-quit an app
+  iphoneuse open <url>            Open a URL or deep link
+  iphoneuse apps                  List installed apps
+  iphoneuse install <path>        Install an .app or .ipa
+  iphoneuse uninstall <bundle-id> Remove an app
 
 AI agents
-  iadb mcp                   Run the MCP server on stdio (claude mcp add iadb -- iadb mcp)
+  iphoneuse mcp                   Run the MCP server on stdio (claude mcp add iphoneuse -- iphoneuse mcp)
 
 Background service
-  iadb service install       Start iadb at login and auto re-sign before the 7-day expiry
-  iadb service uninstall     Remove the login service
-  iadb start-server          Start the background daemon now
-  iadb kill-server           Stop the daemon and all helpers
-  iadb logs [-n 50]          Show the daemon log
-  iadb forget                Remove a device's setup
+  iphoneuse service install       Start iphoneuse at login and auto re-sign before the 7-day expiry
+  iphoneuse service uninstall     Remove the login service
+  iphoneuse start-server          Start the background daemon now
+  iphoneuse kill-server           Stop the daemon and all helpers
+  iphoneuse logs [-n 50]          Show the daemon log
+  iphoneuse resign                Renew the helper's signature now (normally automatic)
+  iphoneuse forget                Remove a device's setup
 
 Global flags
-  -s <udid|name>             Pick a device (or set IADB_DEVICE)
+  -s <udid|name>             Pick a device (or set IPHONEUSE_DEVICE)
   --version                  Print the version
 `
 
@@ -71,11 +72,11 @@ Global flags
 func Main(argv []string) int {
 	a, err := parseArgs(argv)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "iadb:", err)
+		fmt.Fprintln(os.Stderr, "iphoneuse:", err)
 		return 2
 	}
 	if a.bool("version") || (len(a.pos) > 0 && a.pos[0] == "version") {
-		fmt.Println("iadb", Version)
+		fmt.Println("iphoneuse", Version)
 		return 0
 	}
 	if len(a.pos) == 0 || a.bool("h") || a.bool("help") || a.pos[0] == "help" {
@@ -91,11 +92,11 @@ func Main(argv []string) int {
 		"launch": cmdLaunch, "kill": cmdKill, "open": cmdOpen, "apps": cmdApps,
 		"install": cmdInstall, "uninstall": cmdUninstall,
 		"mcp": cmdMCP, "service": cmdService, "daemon": cmdDaemon,
-		"start-server": cmdStartServer, "kill-server": cmdKillServer, "logs": cmdLogs, "forget": cmdForget,
+		"resign": cmdResign, "start-server": cmdStartServer, "kill-server": cmdKillServer, "logs": cmdLogs, "forget": cmdForget,
 	}
 	handler, ok := handlers[cmd]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "iadb: unknown command %q (run `iadb help`)\n", cmd)
+		fmt.Fprintf(os.Stderr, "iphoneuse: unknown command %q (run `iphoneuse help`)\n", cmd)
 		return 2
 	}
 	if err := handler(a); err != nil {
@@ -106,7 +107,7 @@ func Main(argv []string) int {
 			}
 			return exit.code
 		}
-		fmt.Fprintln(os.Stderr, "iadb:", err)
+		fmt.Fprintln(os.Stderr, "iphoneuse:", err)
 		return 1
 	}
 	return 0
@@ -148,7 +149,7 @@ func cmdDevices(a args) error {
 		return nil
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "UDID\tNAME\tOS\tCONNECTION\tIADB")
+	fmt.Fprintln(w, "UDID\tNAME\tOS\tCONNECTION\tIPHONEUSE")
 	for _, d := range devs {
 		state := "not set up"
 		if c, ok := cfg.Devices[d.UDID]; ok {
@@ -249,7 +250,7 @@ func cmdWait(a args) error {
 		text = strings.Join(a.pos, " ")
 	}
 	if text == "" {
-		return errors.New("usage: iadb wait <text> [--timeout 10] [--gone]")
+		return errors.New("usage: iphoneuse wait <text> [--timeout 10] [--gone]")
 	}
 	timeout, err := a.float("timeout", 10)
 	if err != nil {
@@ -313,7 +314,7 @@ func cmdTap(a args) error {
 	case len(a.pos) >= 1:
 		target["text"] = strings.Join(a.pos, " ")
 	default:
-		return errors.New("usage: iadb tap <x> <y> | tap <text> | tap --ref <n> [--long] [--double]")
+		return errors.New("usage: iphoneuse tap <x> <y> | tap <text> | tap --ref <n> [--long] [--double]")
 	}
 	if a.bool("long") {
 		d, err := a.float("duration", 1.0)
@@ -374,14 +375,14 @@ func cmdSwipe(a args) error {
 		}
 		x1, y1, x2, y2 = vals[0], vals[1], vals[2], vals[3]
 	default:
-		return errors.New("usage: iadb swipe <up|down|left|right> | iadb swipe <x1> <y1> <x2> <y2> [--duration 0.3]")
+		return errors.New("usage: iphoneuse swipe <up|down|left|right> | iphoneuse swipe <x1> <y1> <x2> <y2> [--duration 0.3]")
 	}
 	return c.Swipe(x1, y1, x2, y2, duration)
 }
 
 func cmdType(a args) error {
 	if len(a.pos) == 0 {
-		return errors.New("usage: iadb type <text>")
+		return errors.New("usage: iphoneuse type <text>")
 	}
 	text := strings.Join(a.pos, " ")
 	if a.bool("enter") {
@@ -396,7 +397,7 @@ func cmdType(a args) error {
 
 func cmdKey(a args) error {
 	if len(a.pos) != 1 {
-		return errors.New("usage: iadb key <home|lock|volume-up|volume-down|return|delete|tab|escape>")
+		return errors.New("usage: iphoneuse key <home|lock|volume-up|volume-down|return|delete|tab|escape>")
 	}
 	c, err := connect(a)
 	if err != nil {
@@ -415,7 +416,7 @@ func oneArg(a args, usage string) (string, error) {
 }
 
 func cmdLaunch(a args) error {
-	id, err := oneArg(a, "iadb launch <bundle-id> [--restart]")
+	id, err := oneArg(a, "iphoneuse launch <bundle-id> [--restart]")
 	if err != nil {
 		return err
 	}
@@ -427,7 +428,7 @@ func cmdLaunch(a args) error {
 }
 
 func cmdKill(a args) error {
-	id, err := oneArg(a, "iadb kill <bundle-id>")
+	id, err := oneArg(a, "iphoneuse kill <bundle-id>")
 	if err != nil {
 		return err
 	}
@@ -439,7 +440,7 @@ func cmdKill(a args) error {
 }
 
 func cmdOpen(a args) error {
-	u, err := oneArg(a, "iadb open <url>")
+	u, err := oneArg(a, "iphoneuse open <url>")
 	if err != nil {
 		return err
 	}
@@ -486,7 +487,7 @@ func cmdApps(a args) error {
 }
 
 func cmdInstall(a args) error {
-	path, err := oneArg(a, "iadb install <path.app|path.ipa>")
+	path, err := oneArg(a, "iphoneuse install <path.app|path.ipa>")
 	if err != nil {
 		return err
 	}
@@ -502,7 +503,7 @@ func cmdInstall(a args) error {
 }
 
 func cmdUninstall(a args) error {
-	id, err := oneArg(a, "iadb uninstall <bundle-id>")
+	id, err := oneArg(a, "iphoneuse uninstall <bundle-id>")
 	if err != nil {
 		return err
 	}
@@ -523,12 +524,12 @@ func cmdMCP(a args) error {
 	if len(a.pos) > 0 && a.pos[0] == "config" {
 		exe, _ := os.Executable()
 		fmt.Printf(`Claude Code:
-  claude mcp add iadb -- %[1]s mcp
+  claude mcp add iphoneuse -- %[1]s mcp
 
 Claude Desktop / Cursor / other clients (JSON config):
   {
     "mcpServers": {
-      "iadb": { "command": %[2]q, "args": ["mcp"] }
+      "iphoneuse": { "command": %[2]q, "args": ["mcp"] }
     }
   }
 `, exe, exe)
@@ -542,7 +543,7 @@ func cmdDaemon(a args) error { return daemon.Run() }
 
 func cmdStartServer(a args) error {
 	if service.Installed() {
-		fmt.Println("iadb runs as a login service; it is managed by launchd.")
+		fmt.Println("iphoneuse runs as a login service; it is managed by launchd.")
 		return nil
 	}
 	if err := daemon.Spawn(); err != nil {
@@ -555,7 +556,7 @@ func cmdStartServer(a args) error {
 
 func cmdKillServer(a args) error {
 	if service.Loaded() {
-		fmt.Println("Stopping the login service too (run `iadb service install` to bring it back).")
+		fmt.Println("Stopping the login service too (run `iphoneuse service install` to bring it back).")
 		service.Uninstall()
 	}
 	return daemon.Stop()
@@ -572,7 +573,7 @@ func cmdService(a args) error {
 		if err := service.Install(); err != nil {
 			return err
 		}
-		fmt.Println("iadb now starts at login and re-signs the helper before it expires.")
+		fmt.Println("iphoneuse now starts at login and re-signs the helper before it expires.")
 		return nil
 	case "uninstall":
 		if err := service.Uninstall(); err != nil {
@@ -589,7 +590,7 @@ func cmdService(a args) error {
 		fmt.Println()
 		return nil
 	}
-	return errors.New("usage: iadb service install|uninstall|status")
+	return errors.New("usage: iphoneuse service install|uninstall|status")
 }
 
 func cmdLogs(a args) error {
@@ -626,6 +627,52 @@ func cmdForget(a args) error {
 		return err
 	}
 	os.RemoveAll(filepath.Join(config.Dir(), "build", dev.UDID))
-	fmt.Printf("Forgot %s. The helper app stays on the phone until you delete it (it's named IADBRunner).\n", dev.Name)
+	fmt.Printf("Forgot %s. The helper app stays on the phone until you delete it (it's named iPhoneUseRunner).\n", dev.Name)
 	return nil
+}
+
+func cmdResign(a args) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	dev, err := session.FindConfigured(cfg, session.Selector(a.str("s")))
+	if err != nil {
+		return err
+	}
+	if dev.IsSimulator() {
+		fmt.Println("Simulators don't need signing.")
+		return nil
+	}
+	before := dev.ProfileExpires
+	dev.ResignRequested = true
+	if err := cfg.Save(); err != nil {
+		return err
+	}
+	if err := daemon.Spawn(); err != nil {
+		return err
+	}
+	fmt.Printf("Renewing the helper's signature on %s (current one ends %s)…\n", dev.Name, before.Local().Format("Mon Jan 2 15:04"))
+	deadline := time.Now().Add(10 * time.Minute)
+	for time.Now().Before(deadline) {
+		time.Sleep(2 * time.Second)
+		cfg, err := config.Load()
+		if err != nil {
+			continue
+		}
+		d := cfg.Devices[dev.UDID]
+		if d == nil || d.ResignRequested {
+			continue
+		}
+		st := config.LoadStatus()[dev.UDID]
+		if st.State == "error" {
+			return fmt.Errorf("renewing failed: %s", st.Message)
+		}
+		if !d.ProfileExpires.After(before) {
+			return fmt.Errorf("Apple returned the same signature (still ends %s); iPhoneUse will try again later", d.ProfileExpires.Local().Format("Mon Jan 2 15:04"))
+		}
+		fmt.Printf("Renewed: the helper now works until %s.\n", d.ProfileExpires.Local().Format("Mon Jan 2 15:04"))
+		return nil
+	}
+	return errors.New("timed out waiting for the daemon to renew the signature; see `iphoneuse logs`")
 }

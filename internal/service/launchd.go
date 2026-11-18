@@ -1,4 +1,4 @@
-// Package service installs the iadb daemon as a macOS launchd agent so the
+// Package service installs the iphoneuse daemon as a macOS launchd agent so the
 // helper starts at login and re-signs itself without the user doing anything.
 package service
 
@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/iadb-dev/iadb/internal/config"
+	"github.com/safwanadnan/iphoneuse/internal/config"
 )
 
 // Label is the launchd job label.
-const Label = "dev.iadb.daemon"
+const Label = "dev.iphoneuse.daemon"
 
-// PlistPath is ~/Library/LaunchAgents/dev.iadb.daemon.plist.
+// PlistPath is ~/Library/LaunchAgents/dev.iphoneuse.daemon.plist.
 func PlistPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "Library", "LaunchAgents", Label+".plist")
@@ -38,10 +38,10 @@ func Install() error {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		// Homebrew upgrades replace the Cellar path; prefer the stable symlink.
 		if strings.Contains(resolved, "/Cellar/") {
-			if _, err := os.Stat("/opt/homebrew/bin/iadb"); err == nil {
-				exe = "/opt/homebrew/bin/iadb"
-			} else if _, err := os.Stat("/usr/local/bin/iadb"); err == nil {
-				exe = "/usr/local/bin/iadb"
+			if _, err := os.Stat("/opt/homebrew/bin/iphoneuse"); err == nil {
+				exe = "/opt/homebrew/bin/iphoneuse"
+			} else if _, err := os.Stat("/usr/local/bin/iphoneuse"); err == nil {
+				exe = "/usr/local/bin/iphoneuse"
 			}
 		}
 	}

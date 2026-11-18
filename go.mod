@@ -1,4 +1,4 @@
-module github.com/iadb-dev/iadb
+module github.com/safwanadnan/iphoneuse
 
 go 1.22
 

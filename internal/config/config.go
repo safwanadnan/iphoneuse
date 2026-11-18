@@ -1,4 +1,4 @@
-// Package config stores iadb's per-device setup state and file locations.
+// Package config stores iphoneuse's per-device setup state and file locations.
 package config
 
 import (
@@ -13,7 +13,7 @@ import (
 // DevicePort is the port the helper listens on inside a physical iPhone.
 const DevicePort = 47100
 
-// Device is what `iadb setup` records for one phone or simulator.
+// Device is what `iphoneuse setup` records for one phone or simulator.
 type Device struct {
 	UDID           string    `json:"udid"`
 	Name           string    `json:"name"`
@@ -26,6 +26,8 @@ type Device struct {
 	HelperHash     string    `json:"helperHash"`
 	BuiltAt        time.Time `json:"builtAt"`
 	ProfileExpires time.Time `json:"profileExpires,omitempty"`
+	// ResignRequested asks the daemon to fetch a fresh signature now.
+	ResignRequested bool `json:"resignRequested,omitempty"`
 }
 
 // IsSimulator reports whether the device is an iOS Simulator.
@@ -39,22 +41,22 @@ type Config struct {
 
 var mu sync.Mutex
 
-// Dir is ~/Library/Application Support/iadb (override with IADB_HOME).
+// Dir is ~/Library/Application Support/iphoneuse (override with IPHONEUSE_HOME).
 func Dir() string {
-	if dir := os.Getenv("IADB_HOME"); dir != "" {
+	if dir := os.Getenv("IPHONEUSE_HOME"); dir != "" {
 		return dir
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "Library", "Application Support", "iadb")
+	return filepath.Join(home, "Library", "Application Support", "iphoneuse")
 }
 
-// LogDir is ~/Library/Logs/iadb.
+// LogDir is ~/Library/Logs/iphoneuse.
 func LogDir() string {
-	if dir := os.Getenv("IADB_HOME"); dir != "" {
+	if dir := os.Getenv("IPHONEUSE_HOME"); dir != "" {
 		return filepath.Join(dir, "logs")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "Library", "Logs", "iadb")
+	return filepath.Join(home, "Library", "Logs", "iphoneuse")
 }
 
 func path() string { return filepath.Join(Dir(), "config.json") }

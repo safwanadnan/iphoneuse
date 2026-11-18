@@ -10,10 +10,13 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/iadb-dev/iadb/internal/config"
-	"github.com/iadb-dev/iadb/internal/usbmux"
+	"github.com/safwanadnan/iphoneuse/internal/config"
+	"github.com/safwanadnan/iphoneuse/internal/device"
+	"github.com/safwanadnan/iphoneuse/internal/usbmux"
 )
 
 // Client talks to one device's helper.
@@ -32,7 +35,30 @@ func New(dev *config.Device) *Client {
 				var d net.Dialer
 				return d.DialContext(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", dev.Port))
 			}
-			return usbmux.Dial(dev.UDID, dev.Port)
+			// Cable first (usbmuxd); otherwise the CoreDevice tunnel, which
+			// also works over Wi-Fi.
+			conn, err := usbmux.Dial(dev.UDID, dev.Port)
+			if err == nil {
+				return conn, nil
+			}
+			// The tunnel address rarely changes, so try the remembered one
+			// before asking devicectl (which costs ~0.5 s).
+			cache := filepath.Join(config.Dir(), "tunnel-"+dev.UDID)
+			if ip, rerr := os.ReadFile(cache); rerr == nil && len(ip) > 0 {
+				d := net.Dialer{Timeout: 1500 * time.Millisecond}
+				if conn, derr := d.DialContext(ctx, "tcp", net.JoinHostPort(string(ip), fmt.Sprint(dev.Port))); derr == nil {
+					return conn, nil
+				}
+			}
+			if ip := device.Links()[dev.UDID].TunnelIP; ip != "" {
+				var d net.Dialer
+				conn, derr := d.DialContext(ctx, "tcp", net.JoinHostPort(ip, fmt.Sprint(dev.Port)))
+				if derr == nil {
+					os.WriteFile(cache, []byte(ip), 0o644)
+				}
+				return conn, derr
+			}
+			return nil, err
 		},
 	}
 	return &Client{Device: dev, http: &http.Client{Transport: transport, Timeout: 90 * time.Second}}
@@ -52,7 +78,7 @@ func (c *Client) do(method, path string, query url.Values, body any, timeout tim
 		}
 		reader = bytes.NewReader(data)
 	}
-	u := "http://iadb" + path
+	u := "http://iphoneuse" + path
 	if len(query) > 0 {
 		u += "?" + query.Encode()
 	}

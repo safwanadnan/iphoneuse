@@ -10,26 +10,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iadb-dev/iadb/internal/config"
-	"github.com/iadb-dev/iadb/internal/daemon"
-	"github.com/iadb-dev/iadb/internal/device"
-	"github.com/iadb-dev/iadb/internal/runner"
-	"github.com/iadb-dev/iadb/internal/usbmux"
+	"github.com/safwanadnan/iphoneuse/internal/config"
+	"github.com/safwanadnan/iphoneuse/internal/daemon"
+	"github.com/safwanadnan/iphoneuse/internal/device"
+	"github.com/safwanadnan/iphoneuse/internal/runner"
 )
 
-// Selector returns the device chosen by flag, then $IADB_DEVICE.
+// Selector returns the device chosen by flag, then $IPHONEUSE_DEVICE.
 func Selector(flag string) string {
 	if flag != "" {
 		return flag
 	}
-	return os.Getenv("IADB_DEVICE")
+	return os.Getenv("IPHONEUSE_DEVICE")
 }
 
 // FindConfigured resolves a selector against set-up devices without asking
 // Xcode (fast path used by every command).
 func FindConfigured(cfg *config.Config, selector string) (*config.Device, error) {
 	if len(cfg.Devices) == 0 {
-		return nil, errors.New("no device is set up yet. Plug in your iPhone and run: iadb setup")
+		return nil, errors.New("no device is set up yet. Plug in your iPhone and run: iphoneuse setup")
 	}
 	if selector != "" {
 		var matches []*config.Device
@@ -49,12 +48,17 @@ func FindConfigured(cfg *config.Config, selector string) (*config.Device, error)
 		}
 		// Maybe it is a real device that isn't set up yet.
 		if info, err := device.Resolve(selector); err == nil {
-			return nil, fmt.Errorf("%s is not set up yet. Run: iadb setup -s %s", info.Name, info.UDID)
+			return nil, fmt.Errorf("%s is not set up yet. Run: iphoneuse setup -s %s", info.Name, info.UDID)
 		}
-		return nil, fmt.Errorf("no set-up device matches %q (see `iadb devices`)", selector)
+		return nil, fmt.Errorf("no set-up device matches %q (see `iphoneuse devices`)", selector)
+	}
+	devs := cfg.SortedDevices()
+	if len(devs) == 1 {
+		// Nothing to choose; skip the (slow over Wi-Fi) reachability check.
+		// Callers ping the helper anyway and report if it's unreachable.
+		return devs[0], nil
 	}
 	var online []*config.Device
-	devs := cfg.SortedDevices()
 	var sims map[string]bool
 	for _, d := range devs {
 		if d.IsSimulator() {
@@ -69,7 +73,7 @@ func FindConfigured(cfg *config.Config, selector string) (*config.Device, error)
 			if sims[d.UDID] {
 				online = append(online, d)
 			}
-		} else if _, ok := usbmux.Find(d.UDID); ok {
+		} else if device.Reachable(d.UDID) {
 			online = append(online, d)
 		}
 	}
@@ -85,10 +89,10 @@ func FindConfigured(cfg *config.Config, selector string) (*config.Device, error)
 		return online[0], nil
 	}
 	if len(online) > 1 {
-		return nil, errors.New("more than one device is connected; pick one with -s <udid|name> or set IADB_DEVICE")
+		return nil, errors.New("more than one device is connected; pick one with -s <udid|name> or set IPHONEUSE_DEVICE")
 	}
 	if len(devs) == 1 {
-		return nil, fmt.Errorf("%s is not connected. Plug it in with a cable and unlock it", devs[0].Name)
+		return nil, fmt.Errorf("%s is not connected. Plug it in with a cable (or keep it on the same Wi-Fi) and unlock it", devs[0].Name)
 	}
 	return nil, errors.New("none of your set-up devices is connected. Plug one in with a cable and unlock it")
 }
@@ -118,10 +122,10 @@ func Connect(selector string, wait time.Duration, logf func(string, ...any)) (*r
 		return client, nil
 	}
 	if err := daemon.Spawn(); err != nil {
-		return nil, fmt.Errorf("could not start the iadb daemon: %w", err)
+		return nil, fmt.Errorf("could not start the iphoneuse daemon: %w", err)
 	}
 	if logf != nil {
-		logf("Starting the iadb helper on %s…", dev.Name)
+		logf("Starting the iphoneuse helper on %s…", dev.Name)
 	}
 	deadline := time.Now().Add(wait)
 	lastMsg := ""
@@ -148,5 +152,5 @@ func Connect(selector string, wait time.Duration, logf func(string, ...any)) (*r
 		}
 		time.Sleep(time.Second)
 	}
-	return nil, fmt.Errorf("the helper on %s did not start within %s; check `iadb doctor` and %s", dev.Name, wait, config.LogDir())
+	return nil, fmt.Errorf("the helper on %s did not start within %s; check `iphoneuse doctor` and %s", dev.Name, wait, config.LogDir())
 }

@@ -8,16 +8,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iadb-dev/iadb/internal/config"
-	"github.com/iadb-dev/iadb/internal/daemon"
-	"github.com/iadb-dev/iadb/internal/device"
-	"github.com/iadb-dev/iadb/internal/helper"
-	"github.com/iadb-dev/iadb/internal/runner"
-	"github.com/iadb-dev/iadb/internal/service"
-	"github.com/iadb-dev/iadb/internal/session"
-	"github.com/iadb-dev/iadb/internal/signing"
-	"github.com/iadb-dev/iadb/internal/usbmux"
-	"github.com/iadb-dev/iadb/internal/xcode"
+	"github.com/safwanadnan/iphoneuse/internal/config"
+	"github.com/safwanadnan/iphoneuse/internal/daemon"
+	"github.com/safwanadnan/iphoneuse/internal/device"
+	"github.com/safwanadnan/iphoneuse/internal/helper"
+	"github.com/safwanadnan/iphoneuse/internal/runner"
+	"github.com/safwanadnan/iphoneuse/internal/service"
+	"github.com/safwanadnan/iphoneuse/internal/session"
+	"github.com/safwanadnan/iphoneuse/internal/signing"
+	"github.com/safwanadnan/iphoneuse/internal/usbmux"
+	"github.com/safwanadnan/iphoneuse/internal/xcode"
 )
 
 func step(format string, v ...any) { fmt.Printf("• "+format+"\n", v...) }
@@ -30,7 +30,7 @@ func cmdSetup(a args) error {
 		for _, p := range problems {
 			warn(p)
 		}
-		return exitError{1, "\nFix the above, then run `iadb setup` again."}
+		return exitError{1, "\nFix the above, then run `iphoneuse setup` again."}
 	}
 	dir, _ := xcode.DeveloperDir()
 	ok("Xcode at %s", strings.TrimSuffix(dir, "/Contents/Developer"))
@@ -72,7 +72,7 @@ func cmdSetup(a args) error {
 	// Stop an old helper so the new build can replace it.
 	runner.New(dev).Shutdown()
 
-	// Stop the daemon during the build so an older iadb can't race us.
+	// Stop the daemon during the build so an older iphoneuse can't race us.
 	daemon.Stop()
 
 	step("Building and signing the helper (the first build takes 1–3 minutes)")
@@ -90,7 +90,7 @@ func cmdSetup(a args) error {
 	}
 	ok("Built in %s", time.Since(start).Round(time.Second))
 	if !dev.ProfileExpires.IsZero() {
-		ok("Signature valid until %s", dev.ProfileExpires.Format("Mon Jan 2 15:04"))
+		ok("Signature valid until %s", dev.ProfileExpires.Local().Format("Mon Jan 2 15:04"))
 	}
 	cfg.Devices[dev.UDID] = dev
 	if err := cfg.Save(); err != nil {
@@ -102,7 +102,7 @@ func cmdSetup(a args) error {
 		if err := service.Install(); err != nil {
 			warn("Could not install the login service (%v); using a background daemon instead", err)
 		} else {
-			ok("Installed the login service: iadb keeps the helper running and re-signs it automatically")
+			ok("Installed the login service: iphoneuse keeps the helper running and re-signs it automatically")
 		}
 	}
 	if service.Installed() {
@@ -131,10 +131,10 @@ func cmdSetup(a args) error {
 		client.Key("home")
 	}
 
-	fmt.Printf("\n%s is ready. Try:\n  iadb screenshot\n  iadb tree\n  iadb tap \"Settings\"\n\nFor AI agents: claude mcp add iadb -- iadb mcp\n", dev.Name)
+	fmt.Printf("\n%s is ready. Try:\n  iphoneuse screenshot\n  iphoneuse tree\n  iphoneuse tap \"Settings\"\n\nFor AI agents: claude mcp add iphoneuse -- iphoneuse mcp\n", dev.Name)
 	if dev.FreeTeam {
 		fmt.Println("\nYou're signing with a free Apple ID, so the helper's signature lasts 7 days.")
-		fmt.Println("iadb re-signs it automatically while the phone is connected to this Mac.")
+		fmt.Println("iphoneuse re-signs it automatically while the phone is connected to this Mac.")
 	}
 	return nil
 }
@@ -194,7 +194,7 @@ func preparePhone(info device.Info) error {
 			return nil
 		}
 	}
-	return errors.New("Developer Mode is still off; turn it on and run `iadb setup` again")
+	return errors.New("Developer Mode is still off; turn it on and run `iphoneuse setup` again")
 }
 
 // pickTeam chooses the signing team: --team, the saved one, or the best found.
@@ -224,8 +224,8 @@ func pickTeam(a args, dev *config.Device) error {
 		fmt.Println("  No Apple ID is signed in to Xcode. To fix it:")
 		fmt.Println("    1. Open Xcode → Settings → Accounts")
 		fmt.Println("    2. Click + and sign in with your Apple ID (a free one works)")
-		fmt.Println("    3. Run `iadb setup` again")
-		if os.Getenv("IADB_NO_OPEN") == "" {
+		fmt.Println("    3. Run `iphoneuse setup` again")
+		if os.Getenv("IPHONEUSE_NO_OPEN") == "" {
 			exec.Command("/usr/bin/open", "-a", "Xcode").Run()
 		}
 		return exitError{1, ""}

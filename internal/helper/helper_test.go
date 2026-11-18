@@ -7,19 +7,19 @@ import (
 
 func TestInjectEnvBothFormats(t *testing.T) {
 	v1 := map[string]any{
-		"IADBRunner":             map[string]any{"TestBundlePath": "x", "EnvironmentVariables": map[string]any{"A": "1"}},
+		"iPhoneUseRunner":        map[string]any{"TestBundlePath": "x", "EnvironmentVariables": map[string]any{"A": "1"}},
 		"__xctestrun_metadata__": map[string]any{"FormatVersion": 1},
 	}
 	v2 := map[string]any{"TestConfigurations": []any{map[string]any{"TestTargets": []any{map[string]any{"TestBundlePath": "y"}}}}}
-	env := map[string]any{"IADB_PORT": "47100"}
+	env := map[string]any{"IPHONEUSE_PORT": "47100"}
 	injectEnv(v1, env)
 	injectEnv(v2, env)
-	t1 := v1["IADBRunner"].(map[string]any)
-	if t1["EnvironmentVariables"].(map[string]any)["IADB_PORT"] != "47100" || t1["EnvironmentVariables"].(map[string]any)["A"] != "1" {
+	t1 := v1["iPhoneUseRunner"].(map[string]any)
+	if t1["EnvironmentVariables"].(map[string]any)["IPHONEUSE_PORT"] != "47100" || t1["EnvironmentVariables"].(map[string]any)["A"] != "1" {
 		t.Fatalf("v1 not patched: %v", t1)
 	}
 	t2 := v2["TestConfigurations"].([]any)[0].(map[string]any)["TestTargets"].([]any)[0].(map[string]any)
-	if t2["TestingEnvironmentVariables"].(map[string]any)["IADB_PORT"] != "47100" {
+	if t2["TestingEnvironmentVariables"].(map[string]any)["IPHONEUSE_PORT"] != "47100" {
 		t.Fatalf("v2 not patched: %v", t2)
 	}
 }

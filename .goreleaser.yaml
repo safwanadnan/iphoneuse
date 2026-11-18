@@ -1,31 +1,31 @@
 version: 2
-project_name: iadb
+project_name: iphoneuse
 builds:
-  - main: ./cmd/iadb
-    binary: iadb
+  - main: ./cmd/iphoneuse
+    binary: iphoneuse
     env: [CGO_ENABLED=0]
     goos: [darwin]
     goarch: [arm64, amd64]
     ldflags: ["-s -w -X main.version={{.Version}}"]
 archives:
   - formats: [tar.gz]
-    name_template: "iadb_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "iphoneuse_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files: [LICENSE, README.md]
 checksum:
   name_template: checksums.txt
 brews:
-  - name: iadb
+  - name: iphoneuse
     repository:
-      owner: iadb-dev
+      owner: safwanadnan
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: https://github.com/iadb-dev/iadb
-    description: adb for iPhone - control a real iPhone from your Mac, CLI and MCP
+    homepage: https://github.com/safwanadnan/iphoneuse
+    description: Computer use, for your iPhone - let Claude, ChatGPT and other AI agents use your iPhone
     license: MIT
     install: |
-      bin.install "iadb"
+      bin.install "iphoneuse"
     caveats: |
       Plug in your iPhone and run:
-        iadb setup
+        iphoneuse setup
     test: |
-      system "#{bin}/iadb", "--version"
+      system "#{bin}/iphoneuse", "--version"

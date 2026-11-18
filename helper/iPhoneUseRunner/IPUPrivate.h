@@ -5,7 +5,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// Thin wrappers around private XCTest API. Every call is guarded with
 /// respondsToSelector: and returns nil/NO when Apple changes things, so the
 /// helper degrades instead of crashing.
-@interface IADBPrivate : NSObject
+@interface IPUPrivate : NSObject
 
 /// The app currently in the foreground (not SpringBoard when another app is up).
 + (nullable XCUIApplication *)activeApplication NS_SWIFT_NAME(activeApplication());

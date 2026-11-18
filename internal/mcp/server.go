@@ -1,4 +1,4 @@
-// Package mcp serves iadb's commands as Model Context Protocol tools over
+// Package mcp serves iphoneuse's commands as Model Context Protocol tools over
 // stdio, so AI agents (Claude, Cursor, Codex, …) can drive an iPhone.
 package mcp
 
@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iadb-dev/iadb/internal/device"
-	"github.com/iadb-dev/iadb/internal/runner"
-	"github.com/iadb-dev/iadb/internal/session"
+	"github.com/safwanadnan/iphoneuse/internal/device"
+	"github.com/safwanadnan/iphoneuse/internal/runner"
+	"github.com/safwanadnan/iphoneuse/internal/session"
 )
 
 type request struct {
@@ -40,7 +40,7 @@ type content map[string]any
 
 func text(s string) content { return content{"type": "text", "text": s} }
 
-const instructions = `iadb controls a real iPhone (or iOS Simulator) connected to this Mac.
+const instructions = `iphoneuse controls a real iPhone (or iOS Simulator) connected to this Mac.
 Loop: call "screen" to see the screenshot and the numbered element list, act with "tap" (prefer ref numbers from the latest screen/tree, or visible text), "type_text", "swipe", "press_key", then call "screen" again to check the result.
 Coordinates are in points; the screenshot from "screen" is rendered at point resolution, so its pixel coordinates are tap coordinates.
 Refs are only valid until the screen changes; refresh with "screen" or "tree" after every action.`
@@ -143,7 +143,7 @@ func (s *Server) handle(req request) {
 		reply(map[string]any{
 			"protocolVersion": version,
 			"capabilities":    map[string]any{"tools": map[string]any{}},
-			"serverInfo":      map[string]any{"name": "iadb", "version": s.Version},
+			"serverInfo":      map[string]any{"name": "iphoneuse", "version": s.Version},
 			"instructions":    instructions,
 		})
 	case "ping":

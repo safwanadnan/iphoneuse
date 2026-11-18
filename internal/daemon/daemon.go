@@ -17,11 +17,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/iadb-dev/iadb/internal/config"
-	"github.com/iadb-dev/iadb/internal/device"
-	"github.com/iadb-dev/iadb/internal/helper"
-	"github.com/iadb-dev/iadb/internal/runner"
-	"github.com/iadb-dev/iadb/internal/usbmux"
+	"github.com/safwanadnan/iphoneuse/internal/config"
+	"github.com/safwanadnan/iphoneuse/internal/device"
+	"github.com/safwanadnan/iphoneuse/internal/helper"
+	"github.com/safwanadnan/iphoneuse/internal/runner"
 )
 
 // ResignBefore is how long before profile expiry the daemon re-signs.
@@ -38,7 +37,7 @@ func lock() (*os.File, error) {
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		f.Close()
-		return nil, errors.New("another iadb daemon is already running")
+		return nil, errors.New("another iphoneuse daemon is already running")
 	}
 	f.Truncate(0)
 	fmt.Fprintf(f, "%d\n", os.Getpid())
@@ -120,10 +119,11 @@ type helperProc struct {
 }
 
 type daemon struct {
-	procs    map[string]*helperProc
-	failures map[string]int
-	nextTry  map[string]time.Time
-	status   map[string]config.Status
+	procs     map[string]*helperProc
+	failures  map[string]int
+	nextTry   map[string]time.Time
+	nextBuild map[string]time.Time
+	status    map[string]config.Status
 }
 
 // Run is the daemon's main loop.
@@ -134,13 +134,14 @@ func Run() error {
 	}
 	defer lockFile.Close()
 	log.SetFlags(log.LstdFlags)
-	log.Printf("iadb daemon started (pid %d)", os.Getpid())
+	log.Printf("iphoneuse daemon started (pid %d)", os.Getpid())
 
 	d := &daemon{
-		procs:    map[string]*helperProc{},
-		failures: map[string]int{},
-		nextTry:  map[string]time.Time{},
-		status:   config.LoadStatus(),
+		procs:     map[string]*helperProc{},
+		failures:  map[string]int{},
+		nextTry:   map[string]time.Time{},
+		nextBuild: map[string]time.Time{},
+		status:    config.LoadStatus(),
 	}
 	exe, _ := os.Executable()
 	startInfo, _ := os.Stat(exe)
@@ -160,11 +161,11 @@ func Run() error {
 			config.SaveStatus(d.status)
 			return nil
 		case <-ticker.C:
-			// If iadb was upgraded, this process is running old code that would
+			// If iphoneuse was upgraded, this process is running old code that would
 			// fight the new version (e.g. rebuild the helper from stale source).
 			// Exit so launchd, or the next command, starts the new binary.
 			if info, err := os.Stat(exe); err == nil && startInfo != nil && !info.ModTime().Equal(startInfo.ModTime()) {
-				log.Printf("iadb binary changed on disk; restarting")
+				log.Printf("iphoneuse binary changed on disk; restarting")
 				for udid := range d.procs {
 					d.stop(udid, "restarting")
 				}
@@ -216,7 +217,7 @@ func (d *daemon) tick() {
 	for udid, dev := range cfg.Devices {
 		present := booted[udid]
 		if !dev.IsSimulator() {
-			_, present = usbmux.Find(udid)
+			present = device.Reachable(udid)
 		}
 		if !present {
 			if _, ok := d.procs[udid]; ok {
@@ -227,18 +228,21 @@ func (d *daemon) tick() {
 			continue
 		}
 		if helper.Building(udid) {
-			continue // `iadb setup` (or another daemon pass) is building right now
+			continue // `iphoneuse setup` (or another daemon pass) is building right now
 		}
 		if p, ok := d.procs[udid]; ok && dev.BuiltAt.After(p.startedAt) {
 			d.stop(udid, "restarting") // a newer build exists; run that one
 		}
-		if needsBuild(dev) {
+		if reason := buildReason(dev); reason != "" && time.Now().After(d.nextBuild[udid]) {
 			if _, ok := d.procs[udid]; ok {
 				runner.New(dev).Shutdown()
 				d.stop(udid, "rebuilding")
 			}
-			d.rebuild(cfg, dev)
+			d.rebuild(cfg, dev, reason)
 			continue
+		}
+		if !usable(dev) {
+			continue // nothing runnable until a build succeeds
 		}
 		if _, ok := d.procs[udid]; !ok && time.Now().After(d.nextTry[udid]) {
 			d.start(dev)
@@ -254,39 +258,72 @@ func (d *daemon) tick() {
 	}
 }
 
-func needsBuild(dev *config.Device) bool {
-	if dev.XCTestRun == "" || dev.HelperHash != helper.Hash() {
-		return true
+// buildReason says why the helper must be (re)built now, or "" if it needn't.
+func buildReason(dev *config.Device) string {
+	if dev.XCTestRun == "" {
+		return "first build"
 	}
 	if _, err := os.Stat(dev.XCTestRun); err != nil {
-		return true
+		return "build files missing"
 	}
-	return !dev.IsSimulator() && !dev.ProfileExpires.IsZero() && time.Until(dev.ProfileExpires) < ResignBefore
+	if dev.HelperHash != helper.Hash() {
+		return "helper updated"
+	}
+	if dev.ResignRequested {
+		return "re-sign requested"
+	}
+	if !dev.IsSimulator() && !dev.ProfileExpires.IsZero() && time.Until(dev.ProfileExpires) < ResignBefore {
+		return "signature expires " + dev.ProfileExpires.Local().Format("Mon Jan 2 15:04")
+	}
+	return ""
 }
 
-func (d *daemon) rebuild(cfg *config.Config, dev *config.Device) {
-	if time.Now().Before(d.nextTry[dev.UDID]) {
-		return
+// usable reports whether the current build can run (exists, not expired).
+func usable(dev *config.Device) bool {
+	if dev.XCTestRun == "" {
+		return false
 	}
-	reason := "helper updated"
-	if !dev.ProfileExpires.IsZero() && time.Until(dev.ProfileExpires) < ResignBefore {
-		reason = "signature expires " + dev.ProfileExpires.Format("Jan 2 15:04")
+	if _, err := os.Stat(dev.XCTestRun); err != nil {
+		return false
 	}
-	log.Printf("%s: re-signing helper (%s)", dev.Name, reason)
+	return dev.IsSimulator() || dev.ProfileExpires.IsZero() || time.Now().Before(dev.ProfileExpires)
+}
+
+// rebuild builds and signs the helper again. For a re-sign it first deletes
+// the cached provisioning profile; otherwise Xcode would reuse it and the
+// expiry date would never move.
+func (d *daemon) rebuild(cfg *config.Config, dev *config.Device, reason string) {
+	resign := !dev.IsSimulator() && (dev.ResignRequested || strings.HasPrefix(reason, "signature expires"))
+	log.Printf("%s: rebuilding helper (%s)", dev.Name, reason)
 	d.setStatus(dev.UDID, "building", reason, 0)
-	if err := helper.Build(dev, nil); err != nil {
+	before := dev.ProfileExpires
+	if resign {
+		if n := helper.ForgetProfiles(dev); n > 0 {
+			log.Printf("%s: removed %d cached provisioning profile(s)", dev.Name, n)
+		}
+	}
+	err := helper.Build(dev, nil)
+	dev.ResignRequested = false
+	if saveErr := cfg.Save(); saveErr != nil {
+		log.Printf("config save: %v", saveErr)
+	}
+	if err != nil {
 		log.Printf("%s: build failed: %v", dev.Name, err)
 		d.setStatus(dev.UDID, "error", err.Error(), 0)
-		d.backoff(dev.UDID)
-		notify("iadb couldn't re-sign the helper", dev.Name+": run `iadb doctor` for details")
+		d.nextBuild[dev.UDID] = time.Now().Add(15 * time.Minute)
+		notify("iPhoneUse couldn't re-sign the helper", dev.Name+": run `iphoneuse doctor` for details")
 		return
 	}
-	if err := cfg.Save(); err != nil {
-		log.Printf("config save: %v", err)
-	}
-	log.Printf("%s: helper re-signed, valid until %s", dev.Name, dev.ProfileExpires.Format(time.RFC1123))
-	if !dev.ProfileExpires.IsZero() {
-		notify("iadb re-signed the helper", fmt.Sprintf("%s is good until %s", dev.Name, dev.ProfileExpires.Format("Mon Jan 2")))
+	d.nextBuild[dev.UDID] = time.Time{}
+	if resign {
+		if !dev.ProfileExpires.After(before) {
+			// Apple handed back the same profile; don't loop. Try again later.
+			log.Printf("%s: re-sign did not extend the signature (still %s)", dev.Name, dev.ProfileExpires.Local().Format(time.RFC1123))
+			d.nextBuild[dev.UDID] = time.Now().Add(6 * time.Hour)
+		} else {
+			log.Printf("%s: re-signed, now valid until %s", dev.Name, dev.ProfileExpires.Local().Format(time.RFC1123))
+			notify("iPhoneUse renewed your iPhone helper", fmt.Sprintf("%s is good until %s", dev.Name, dev.ProfileExpires.Local().Format("Mon Jan 2")))
+		}
 	}
 	d.start(dev)
 }

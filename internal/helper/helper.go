@@ -1,5 +1,5 @@
 // Package helper extracts, builds, signs and launches the on-device helper
-// (an XCUITest runner) that iadb talks to.
+// (an XCUITest runner) that iphoneuse talks to.
 package helper
 
 import (
@@ -18,16 +18,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/iadb-dev/iadb"
-	"github.com/iadb-dev/iadb/internal/config"
-	"github.com/iadb-dev/iadb/internal/signing"
-	"github.com/iadb-dev/iadb/internal/xcode"
+	"github.com/safwanadnan/iphoneuse"
+	"github.com/safwanadnan/iphoneuse/internal/config"
+	"github.com/safwanadnan/iphoneuse/internal/signing"
+	"github.com/safwanadnan/iphoneuse/internal/xcode"
 	"howett.net/plist"
 )
 
 const (
-	project = "IADBHelper.xcodeproj"
-	scheme  = "IADBRunner"
+	project = "iPhoneUseHelper.xcodeproj"
+	scheme  = "iPhoneUseRunner"
 )
 
 var (
@@ -35,13 +35,13 @@ var (
 	hash     string
 )
 
-// Hash identifies the embedded helper source; a new iadb version with a
+// Hash identifies the embedded helper source; a new iphoneuse version with a
 // changed helper triggers a rebuild.
 func Hash() string {
 	hashOnce.Do(func() {
 		h := sha256.New()
 		var files []string
-		fs.WalkDir(iadb.HelperFS, "helper", func(path string, d fs.DirEntry, err error) error {
+		fs.WalkDir(iphoneuse.HelperFS, "helper", func(path string, d fs.DirEntry, err error) error {
 			if err == nil && !d.IsDir() && !strings.Contains(path, "xcuserdata") {
 				files = append(files, path)
 			}
@@ -49,7 +49,7 @@ func Hash() string {
 		})
 		sort.Strings(files)
 		for _, f := range files {
-			data, _ := iadb.HelperFS.ReadFile(f)
+			data, _ := iphoneuse.HelperFS.ReadFile(f)
 			h.Write([]byte(f))
 			h.Write(data)
 		}
@@ -58,7 +58,7 @@ func Hash() string {
 	return hash
 }
 
-// Extract writes the helper source to the iadb support directory.
+// Extract writes the helper source to the iphoneuse support directory.
 func Extract() (string, error) {
 	dir := filepath.Join(config.Dir(), "helper", Hash())
 	if _, err := os.Stat(filepath.Join(dir, project)); err == nil {
@@ -66,7 +66,7 @@ func Extract() (string, error) {
 	}
 	tmp := dir + ".tmp"
 	os.RemoveAll(tmp)
-	err := fs.WalkDir(iadb.HelperFS, "helper", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(iphoneuse.HelperFS, "helper", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func Extract() (string, error) {
 		if d.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
-		data, err := iadb.HelperFS.ReadFile(path)
+		data, err := iphoneuse.HelperFS.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -106,9 +106,9 @@ func Diagnose(output string) string {
 		return "NEEDS_TRUST: On your iPhone open Settings → General → VPN & Device Management, tap your Apple ID under \"Developer App\", and tap Trust."
 	case strings.Contains(lower, "no accounts") || strings.Contains(lower, "no account for team") ||
 		strings.Contains(lower, "no signing certificate") && strings.Contains(lower, "found"):
-		return "Xcode has no Apple ID to sign with. Open Xcode → Settings → Accounts, add your Apple ID, then run `iadb setup` again."
+		return "Xcode has no Apple ID to sign with. Open Xcode → Settings → Accounts, add your Apple ID, then run `iphoneuse setup` again."
 	case strings.Contains(lower, "maximum number of apps for free development profiles"):
-		return "Free Apple IDs can only have 3 sideloaded apps on a phone. Delete one of your other sideloaded apps and run `iadb setup` again."
+		return "Free Apple IDs can only have 3 sideloaded apps on a phone. Delete one of your other sideloaded apps and run `iphoneuse setup` again."
 	case strings.Contains(lower, "developer mode disabled") || strings.Contains(lower, "developer mode is disabled"):
 		return "Developer Mode is off. On your iPhone open Settings → Privacy & Security → Developer Mode, turn it on, and restart the phone."
 	case strings.Contains(lower, "is locked") || strings.Contains(lower, "passcode protected"):
@@ -155,7 +155,7 @@ func Build(dev *config.Device, logw io.Writer) error {
 			"-allowProvisioningDeviceRegistration",
 			"DEVELOPMENT_TEAM="+dev.Team,
 			"CODE_SIGN_STYLE=Automatic",
-			"IADB_BUNDLE_SUFFIX=."+strings.ToLower(dev.Team),
+			"IPHONEUSE_BUNDLE_SUFFIX=."+strings.ToLower(dev.Team), // → RunnerBundlePrefix
 		)
 	}
 
@@ -192,7 +192,7 @@ func Build(dev *config.Device, logw io.Writer) error {
 	matches, _ := filepath.Glob(filepath.Join(derived, "Build", "Products", "*"+platform+"*.xctestrun"))
 	var xctestrun string
 	for _, m := range matches {
-		if !strings.Contains(filepath.Base(m), "iadb-") {
+		if !strings.Contains(filepath.Base(m), "iphoneuse-") {
 			xctestrun = m
 		}
 	}
@@ -221,20 +221,20 @@ func Build(dev *config.Device, logw io.Writer) error {
 func RunnerCommand(ctx context.Context, dev *config.Device) (*exec.Cmd, error) {
 	data, err := os.ReadFile(dev.XCTestRun)
 	if err != nil {
-		return nil, fmt.Errorf("helper is not built for %s; run `iadb setup`: %w", dev.Name, err)
+		return nil, fmt.Errorf("helper is not built for %s; run `iphoneuse setup`: %w", dev.Name, err)
 	}
 	var run map[string]any
 	format, err := plist.Unmarshal(data, &run)
 	if err != nil {
 		return nil, err
 	}
-	env := map[string]any{"IADB_PORT": fmt.Sprint(dev.Port)}
+	env := map[string]any{"IPHONEUSE_PORT": fmt.Sprint(dev.Port)}
 	injectEnv(run, env)
 	patched, err := plist.Marshal(run, format)
 	if err != nil {
 		return nil, err
 	}
-	path := filepath.Join(filepath.Dir(dev.XCTestRun), "iadb-"+dev.UDID+".xctestrun")
+	path := filepath.Join(filepath.Dir(dev.XCTestRun), "iphoneuse-"+dev.UDID+".xctestrun")
 	if err := os.WriteFile(path, patched, 0o644); err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func RunnerCommand(ctx context.Context, dev *config.Device) (*exec.Cmd, error) {
 		"test-without-building",
 		"-xctestrun", path,
 		"-destination", "id="+dev.UDID,
-		"-only-testing:IADBRunner/IADBRunner/testServe",
+		"-only-testing:iPhoneUseRunner/iPhoneUseRunner/testServe",
 	)
 	return cmd, nil
 }
@@ -337,4 +337,31 @@ func Building(udid string) bool {
 	}
 	unlock()
 	return false
+}
+
+// RunnerBundlePrefix is the helper's bundle id for a signing team.
+func RunnerBundlePrefix(team string) string {
+	return "dev.iphoneuse.runner." + strings.ToLower(team)
+}
+
+// ForgetProfiles deletes Xcode's cached provisioning profiles for this
+// device's helper, so the next build asks Apple for a fresh one.
+func ForgetProfiles(dev *config.Device) int {
+	if dev.Team == "" {
+		return 0
+	}
+	want := RunnerBundlePrefix(dev.Team)
+	removed := 0
+	for _, dir := range signing.ProfileDirs() {
+		files, _ := filepath.Glob(filepath.Join(dir, "*.mobileprovision"))
+		for _, f := range files {
+			name, _, err := signing.ProfileInfo(f)
+			if err == nil && strings.Contains(name, want) {
+				if os.Remove(f) == nil {
+					removed++
+				}
+			}
+		}
+	}
+	return removed
 }

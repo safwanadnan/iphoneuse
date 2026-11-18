@@ -16,10 +16,10 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "587E7BDB575E7D57DB9A6F99"
-               BuildableName = "IADBRunner.xctest"
-               BlueprintName = "IADBRunner"
-               ReferencedContainer = "container:IADBHelper.xcodeproj">
+               BlueprintIdentifier = "6F72383194889B03520B516F"
+               BuildableName = "iPhoneUseRunner.xctest"
+               BlueprintName = "iPhoneUseRunner"
+               ReferencedContainer = "container:iPhoneUseHelper.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,10 +33,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "587E7BDB575E7D57DB9A6F99"
-            BuildableName = "IADBRunner.xctest"
-            BlueprintName = "IADBRunner"
-            ReferencedContainer = "container:IADBHelper.xcodeproj">
+            BlueprintIdentifier = "6F72383194889B03520B516F"
+            BuildableName = "iPhoneUseRunner.xctest"
+            BlueprintName = "iPhoneUseRunner"
+            ReferencedContainer = "container:iPhoneUseHelper.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -45,10 +45,10 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "587E7BDB575E7D57DB9A6F99"
-               BuildableName = "IADBRunner.xctest"
-               BlueprintName = "IADBRunner"
-               ReferencedContainer = "container:IADBHelper.xcodeproj">
+               BlueprintIdentifier = "6F72383194889B03520B516F"
+               BuildableName = "iPhoneUseRunner.xctest"
+               BlueprintName = "iPhoneUseRunner"
+               ReferencedContainer = "container:iPhoneUseHelper.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -68,10 +68,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "587E7BDB575E7D57DB9A6F99"
-            BuildableName = "IADBRunner.xctest"
-            BlueprintName = "IADBRunner"
-            ReferencedContainer = "container:IADBHelper.xcodeproj">
+            BlueprintIdentifier = "6F72383194889B03520B516F"
+            BuildableName = "iPhoneUseRunner.xctest"
+            BlueprintName = "iPhoneUseRunner"
+            ReferencedContainer = "container:iPhoneUseHelper.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </LaunchAction>
@@ -84,10 +84,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "587E7BDB575E7D57DB9A6F99"
-            BuildableName = "IADBRunner.xctest"
-            BlueprintName = "IADBRunner"
-            ReferencedContainer = "container:IADBHelper.xcodeproj">
+            BlueprintIdentifier = "6F72383194889B03520B516F"
+            BuildableName = "iPhoneUseRunner.xctest"
+            BlueprintName = "iPhoneUseRunner"
+            ReferencedContainer = "container:iPhoneUseHelper.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </ProfileAction>

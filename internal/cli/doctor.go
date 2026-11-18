@@ -5,21 +5,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iadb-dev/iadb/internal/config"
-	"github.com/iadb-dev/iadb/internal/daemon"
-	"github.com/iadb-dev/iadb/internal/device"
-	"github.com/iadb-dev/iadb/internal/helper"
-	"github.com/iadb-dev/iadb/internal/runner"
-	"github.com/iadb-dev/iadb/internal/service"
-	"github.com/iadb-dev/iadb/internal/signing"
-	"github.com/iadb-dev/iadb/internal/xcode"
+	"github.com/safwanadnan/iphoneuse/internal/config"
+	"github.com/safwanadnan/iphoneuse/internal/daemon"
+	"github.com/safwanadnan/iphoneuse/internal/device"
+	"github.com/safwanadnan/iphoneuse/internal/helper"
+	"github.com/safwanadnan/iphoneuse/internal/runner"
+	"github.com/safwanadnan/iphoneuse/internal/service"
+	"github.com/safwanadnan/iphoneuse/internal/signing"
+	"github.com/safwanadnan/iphoneuse/internal/xcode"
 )
 
 func cmdDoctor(a args) error {
 	healthy := true
 	bad := func(format string, v ...any) { healthy = false; warn(format, v...) }
 
-	fmt.Printf("iadb %s (helper %s)\n\n", Version, helper.Hash())
+	fmt.Printf("iphoneuse %s (helper %s)\n\n", Version, helper.Hash())
 
 	step("Xcode")
 	if dir, err := xcode.DeveloperDir(); err != nil {
@@ -54,9 +54,9 @@ func cmdDoctor(a args) error {
 	case service.Installed() && running:
 		ok("login service installed, daemon running (pid %d)", pid)
 	case running:
-		ok("daemon running (pid %d); run `iadb service install` to start it at login and auto re-sign", pid)
+		ok("daemon running (pid %d); run `iphoneuse service install` to start it at login and auto re-sign", pid)
 	case service.Installed():
-		bad("login service installed but the daemon is not running; see `iadb logs`")
+		bad("login service installed but the daemon is not running; see `iphoneuse logs`")
 	default:
 		warn("daemon not running (it starts on demand)")
 	}
@@ -80,7 +80,7 @@ func cmdDoctor(a args) error {
 		fmt.Printf("  %s (%s, %s, %s)\n", d.Name, d.OS, d.Kind, d.Connection)
 		if d.Kind == "device" {
 			if !d.Paired {
-				bad("    not paired: unlock it and run `iadb setup`")
+				bad("    not paired: unlock it and run `iphoneuse setup`")
 			}
 			if d.DeveloperMode != "enabled" && d.Online() {
 				d.DeveloperMode = device.DeveloperMode(d.UDID)
@@ -109,18 +109,18 @@ func cmdDoctor(a args) error {
 
 func checkConfigured(udid string, dev *config.Device, status map[string]config.Status, online bool, bad func(string, ...any)) {
 	if dev == nil {
-		warn("    not set up: run `iadb setup -s %s`", udid)
+		warn("    not set up: run `iphoneuse setup -s %s`", udid)
 		return
 	}
 	if dev.HelperHash != helper.Hash() {
-		warn("    helper is from an older iadb; it will be rebuilt automatically")
+		warn("    helper is from an older iphoneuse; it will be rebuilt automatically")
 	}
 	if !dev.ProfileExpires.IsZero() {
 		left := time.Until(dev.ProfileExpires)
 		if left < 0 {
-			bad("    signature expired %s ago; reconnect the phone or run `iadb setup`", (-left).Round(time.Hour))
+			bad("    signature expired %s ago; reconnect the phone or run `iphoneuse setup`", (-left).Round(time.Hour))
 		} else {
-			ok("    signature valid for %s (until %s)", left.Round(time.Hour), dev.ProfileExpires.Format("Mon Jan 2 15:04"))
+			ok("    signature valid for %s (until %s)", left.Round(time.Hour), dev.ProfileExpires.Local().Format("Mon Jan 2 15:04"))
 		}
 	}
 	if st, has := status[dev.UDID]; has {

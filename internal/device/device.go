@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/iadb-dev/iadb/internal/usbmux"
-	"github.com/iadb-dev/iadb/internal/xcode"
+	"github.com/safwanadnan/iphoneuse/internal/usbmux"
+	"github.com/safwanadnan/iphoneuse/internal/xcode"
 	"howett.net/plist"
 )
 
-// Info describes one phone or simulator that iadb can see.
+// Info describes one phone or simulator that iphoneuse can see.
 type Info struct {
 	UDID          string `json:"udid"`
 	Name          string `json:"name"`
@@ -26,7 +27,7 @@ type Info struct {
 	DeveloperMode string `json:"developerMode,omitempty"` // enabled, disabled, unknown
 }
 
-// Online reports whether iadb can talk to the device right now.
+// Online reports whether iphoneuse can talk to the device right now.
 func (i Info) Online() bool { return i.Connection != "offline" }
 
 type devicectlList struct {
@@ -45,9 +46,10 @@ type devicectlList struct {
 				Reality       string `json:"reality"`
 			} `json:"hardwareProperties"`
 			ConnectionProperties struct {
-				PairingState  string `json:"pairingState"`
-				TransportType string `json:"transportType"`
-				TunnelState   string `json:"tunnelState"`
+				PairingState    string `json:"pairingState"`
+				TransportType   string `json:"transportType"`
+				TunnelState     string `json:"tunnelState"`
+				TunnelIPAddress string `json:"tunnelIPAddress"`
 			} `json:"connectionProperties"`
 		} `json:"devices"`
 	} `json:"result"`
@@ -78,6 +80,9 @@ func Physical() ([]Info, error) {
 			continue
 		}
 		conn := attached[hw.UDID]
+		if conn == "" && d.ConnectionProperties.TransportType == "localNetwork" {
+			conn = "wifi"
+		}
 		if conn == "" {
 			conn = "offline"
 		}
@@ -97,6 +102,57 @@ func Physical() ([]Info, error) {
 		})
 	}
 	return out, nil
+}
+
+// Link is how a phone is reachable over the network right now.
+type Link struct {
+	Transport string // "wired", "localNetwork", or "" when not connected
+	TunnelIP  string // CoreDevice tunnel address, set while a tunnel is up
+}
+
+var (
+	linkMu    sync.Mutex
+	linkCache map[string]Link
+	linkAt    time.Time
+)
+
+// Links reports every phone's CoreDevice connection (cached for 5 s, since
+// devicectl takes about half a second). This is what makes Wi-Fi work: when
+// the cable is out, Xcode still reaches a paired phone over the local
+// network, and while the helper runs there's a tunnel address to dial.
+func Links() map[string]Link {
+	linkMu.Lock()
+	defer linkMu.Unlock()
+	if linkCache != nil && time.Since(linkAt) < 5*time.Second {
+		return linkCache
+	}
+	out := map[string]Link{}
+	data, err := xcode.RunJSON(30*time.Second, "devicectl", "list", "devices")
+	if err == nil {
+		var list devicectlList
+		if json.Unmarshal(data, &list) == nil {
+			for _, d := range list.Result.Devices {
+				c := d.ConnectionProperties
+				link := Link{Transport: c.TransportType}
+				if c.TunnelState == "connected" {
+					link.TunnelIP = c.TunnelIPAddress
+				}
+				out[d.HardwareProperties.UDID] = link
+			}
+		}
+	}
+	linkCache, linkAt = out, time.Now()
+	return out
+}
+
+// Reachable reports whether a phone can be used right now, by cable (usbmuxd)
+// or over Wi-Fi (CoreDevice local network).
+func Reachable(udid string) bool {
+	if _, ok := usbmux.Find(udid); ok {
+		return true
+	}
+	l := Links()[udid]
+	return l.Transport == "localNetwork" || l.Transport == "wired"
 }
 
 // DeveloperMode asks the phone whether Developer Mode is on
@@ -189,7 +245,7 @@ func Resolve(selector string) (Info, error) {
 		if len(matches) > 1 {
 			return Info{}, fmt.Errorf("%q matches %d devices; use the full UDID", selector, len(matches))
 		}
-		return Info{}, fmt.Errorf("no device matches %q (run `iadb devices`)", selector)
+		return Info{}, fmt.Errorf("no device matches %q (run `iphoneuse devices`)", selector)
 	}
 	var online []Info
 	for _, d := range all {
@@ -203,7 +259,7 @@ func Resolve(selector string) (Info, error) {
 	case 1:
 		return online[0], nil
 	}
-	return Info{}, fmt.Errorf("more than one device is connected; pick one with -s <udid|name> (see `iadb devices`)")
+	return Info{}, fmt.Errorf("more than one device is connected; pick one with -s <udid|name> (see `iphoneuse devices`)")
 }
 
 // App is an installed app.

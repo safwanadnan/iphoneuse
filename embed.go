@@ -1,6 +1,6 @@
-// Package iadb embeds the on-device helper source so a single binary can
+// Package iphoneuse embeds the on-device helper source so a single binary can
 // build, sign and install it on any iPhone with nothing else to download.
-package iadb
+package iphoneuse
 
 import "embed"
 

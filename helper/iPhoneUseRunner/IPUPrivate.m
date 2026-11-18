@@ -1,4 +1,4 @@
-#import "IADBPrivate.h"
+#import "IPUPrivate.h"
 #import <objc/message.h>
 
 #pragma clang diagnostic push
@@ -7,7 +7,7 @@
 
 static NSString *const kSpringBoard = @"com.apple.springboard";
 
-@implementation IADBPrivate
+@implementation IPUPrivate
 
 + (nullable id)axClient
 {

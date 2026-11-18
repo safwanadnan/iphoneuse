@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -112,21 +113,37 @@ func keychainTeams() []Team {
 
 // ProfileExpiry reads ExpirationDate from an app's embedded.mobileprovision.
 func ProfileExpiry(path string) (time.Time, error) {
+	_, exp, err := ProfileInfo(path)
+	return exp, err
+}
+
+// ProfileInfo reads a provisioning profile's name and expiry date.
+func ProfileInfo(path string) (string, time.Time, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return time.Time{}, err
+		return "", time.Time{}, err
 	}
 	// The profile is a CMS envelope around an XML plist; pull the plist out.
 	start := bytes.Index(data, []byte("<?xml"))
 	end := bytes.Index(data, []byte("</plist>"))
 	if start < 0 || end < 0 {
-		return time.Time{}, errors.New("not a provisioning profile")
+		return "", time.Time{}, errors.New("not a provisioning profile")
 	}
 	var profile struct {
+		Name           string
 		ExpirationDate time.Time
 	}
 	if _, err := plist.Unmarshal(data[start:end+len("</plist>")], &profile); err != nil {
-		return time.Time{}, err
+		return "", time.Time{}, err
 	}
-	return profile.ExpirationDate, nil
+	return profile.Name, profile.ExpirationDate, nil
+}
+
+// ProfileDirs are where Xcode caches provisioning profiles.
+func ProfileDirs() []string {
+	home, _ := os.UserHomeDir()
+	return []string{
+		filepath.Join(home, "Library", "MobileDevice", "Provisioning Profiles"),
+		filepath.Join(home, "Library", "Developer", "Xcode", "UserData", "Provisioning Profiles"),
+	}
 }

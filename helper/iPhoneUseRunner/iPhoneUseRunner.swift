@@ -1,9 +1,9 @@
 import XCTest
 import UIKit
 
-/// The single long-running "test" that hosts the iadb helper. It never
-/// finishes on its own: it serves commands until iadb asks it to stop.
-final class IADBRunner: XCTestCase {
+/// The single long-running "test" that hosts the iphoneuse helper. It never
+/// finishes on its own: it serves commands until iphoneuse asks it to stop.
+final class iPhoneUseRunner: XCTestCase {
   static let helperVersion = "1.0.0"
 
   // Not called `testRun`: XCTest already has a `testRun` property, and
@@ -13,34 +13,34 @@ final class IADBRunner: XCTestCase {
     continueAfterFailure = true
     executionTimeAllowance = 60 * 60 * 24 * 365
     let env = ProcessInfo.processInfo.environment
-    let port = UInt16(env["IADB_PORT"] ?? "") ?? 47100
+    let port = UInt16(env["IPHONEUSE_PORT"] ?? "") ?? 47100
     let router = Router()
     let server: HTTPServer
     do {
       server = try HTTPServer(port: port, handler: router.handle)
     } catch {
-      XCTFail("iadb: could not listen on port \(port): \(error)")
+      XCTFail("iphoneuse: could not listen on port \(port): \(error)")
       return
     }
     server.start()
-    log("IADB_READY port=\(port) version=\(IADBRunner.helperVersion)")
+    log("IPHONEUSE_READY port=\(port) version=\(iPhoneUseRunner.helperVersion)")
     while !router.shouldStop {
       autoreleasepool {
         _ = RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.5))
       }
     }
-    log("IADB_STOPPED")
+    log("IPHONEUSE_STOPPED")
   }
 }
 
 /// Writes to stderr, which xcodebuild captures (NSLog goes to the unified log only).
 func log(_ message: String) {
-  FileHandle.standardError.write(Data("iadb: \(message)\n".utf8))
-  // Activity names are always echoed by xcodebuild ("t = 0.01s iadb: …"),
+  FileHandle.standardError.write(Data("iphoneuse: \(message)\n".utf8))
+  // Activity names are always echoed by xcodebuild ("t = 0.01s iphoneuse: …"),
   // unlike stderr from the device, so they double as a reliable log.
   // XCTContext only works on the main thread.
   if Thread.isMainThread {
-    XCTContext.runActivity(named: "iadb: \(message)") { _ in }
+    XCTContext.runActivity(named: "iphoneuse: \(message)") { _ in }
   }
 }
 
@@ -80,8 +80,8 @@ final class Router {
   // MARK: - Apps
 
   private func activeApp() -> XCUIApplication {
-    if let app = IADBPrivate.activeApplication() {
-      IADBPrivate.disableQuiescenceWait(for: app)
+    if let app = IPUPrivate.activeApplication() {
+      IPUPrivate.disableQuiescenceWait(for: app)
       return app
     }
     if let last = lastLaunched, last.state == .runningForeground {
@@ -98,7 +98,7 @@ final class Router {
   }
 
   private func bundleID(_ app: XCUIApplication) -> String {
-    IADBPrivate.bundleID(of: app) ?? (app === springboard ? "com.apple.springboard" : "")
+    IPUPrivate.bundleID(of: app) ?? (app === springboard ? "com.apple.springboard" : "")
   }
 
   private func foregroundApp() -> HTTPResponse {
@@ -149,7 +149,7 @@ final class Router {
     let device = UIDevice.current
     return .json([
       "ok": true,
-      "version": IADBRunner.helperVersion,
+      "version": iPhoneUseRunner.helperVersion,
       "model": device.model,
       "os": "\(device.systemName) \(device.systemVersion)",
       "screen": ["width": screen.bounds.width, "height": screen.bounds.height, "scale": screen.scale],
@@ -174,10 +174,10 @@ final class Router {
     }
     if query["format"] == "jpeg" {
       let quality = Double(query["quality"] ?? "") ?? 0.7
-      guard let data = output.jpegData(compressionQuality: quality) else { throw IADBError("could not encode JPEG") }
+      guard let data = output.jpegData(compressionQuality: quality) else { throw IPUError("could not encode JPEG") }
       return HTTPResponse(status: 200, contentType: "image/jpeg", body: data)
     }
-    guard let data = output.pngData() else { throw IADBError("could not encode PNG") }
+    guard let data = output.pngData() else { throw IPUError("could not encode PNG") }
     return HTTPResponse(status: 200, contentType: "image/png", body: data)
   }
 
@@ -290,11 +290,11 @@ final class Router {
     var point: CGPoint
     var target = ""
     if let ref = body["ref"] as? Int {
-      guard let rect = refs[ref] else { throw IADBError("ref \(ref) not found; run tree again") }
+      guard let rect = refs[ref] else { throw IPUError("ref \(ref) not found; run tree again") }
       point = CGPoint(x: rect.midX, y: rect.midY)
       target = "ref \(ref)"
     } else if let text = body["text"] as? String, !text.isEmpty {
-      guard let element = findElement(text: text) else { throw IADBError("no element matching \"\(text)\" on screen") }
+      guard let element = findElement(text: text) else { throw IPUError("no element matching \"\(text)\" on screen") }
       let rect = element.frame.intersection(UIScreen.main.bounds)
       point = CGPoint(x: rect.midX, y: rect.midY)
       target = "\"\(element.label.isEmpty ? text : element.label)\""
@@ -302,7 +302,7 @@ final class Router {
       point = CGPoint(x: x, y: y)
       target = "(\(Int(x)),\(Int(y)))"
     } else {
-      throw IADBError("tap needs x/y, ref, or text")
+      throw IPUError("tap needs x/y, ref, or text")
     }
     let c = coordinate(point.x, point.y)
     let duration = number(body["duration"]) ?? 0
@@ -347,7 +347,7 @@ final class Router {
     case "home":
       XCUIDevice.shared.press(.home)
     case "lock", "power":
-      if !IADBPrivate.pressLockButton() { return .error("lock button not supported on this iOS version") }
+      if !IPUPrivate.pressLockButton() { return .error("lock button not supported on this iOS version") }
     case "volume-up", "volumeup":
       #if targetEnvironment(simulator)
       return .error("volume keys are not available in the simulator")
@@ -421,7 +421,7 @@ final class Router {
   }
 }
 
-struct IADBError: LocalizedError {
+struct IPUError: LocalizedError {
   let message: String
   init(_ message: String) { self.message = message }
   var errorDescription: String? { message }

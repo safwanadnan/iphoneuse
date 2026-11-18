@@ -38,8 +38,8 @@ func dial() (net.Conn, error) {
 }
 
 func send(conn net.Conn, msg map[string]any) error {
-	msg["ClientVersionString"] = "iadb"
-	msg["ProgName"] = "iadb"
+	msg["ClientVersionString"] = "iphoneuse"
+	msg["ProgName"] = "iphoneuse"
 	body, err := plist.Marshal(msg, plist.XMLFormat)
 	if err != nil {
 		return err
