@@ -1,0 +1,25 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  go:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      - run: make build && ./bin/iadb --version
+  helper:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the committed Xcode project matches project.yml
+        run: |
+          brew install xcodegen
+          cd helper && xcodegen generate && git diff --exit-code
+      - run: make helper-check

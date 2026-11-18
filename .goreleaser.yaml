@@ -1,0 +1,31 @@
+version: 2
+project_name: iadb
+builds:
+  - main: ./cmd/iadb
+    binary: iadb
+    env: [CGO_ENABLED=0]
+    goos: [darwin]
+    goarch: [arm64, amd64]
+    ldflags: ["-s -w -X main.version={{.Version}}"]
+archives:
+  - formats: [tar.gz]
+    name_template: "iadb_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+checksum:
+  name_template: checksums.txt
+brews:
+  - name: iadb
+    repository:
+      owner: iadb-dev
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/iadb-dev/iadb
+    description: adb for iPhone - control a real iPhone from your Mac, CLI and MCP
+    license: MIT
+    install: |
+      bin.install "iadb"
+    caveats: |
+      Plug in your iPhone and run:
+        iadb setup
+    test: |
+      system "#{bin}/iadb", "--version"

@@ -1,0 +1,37 @@
+# XcodeGen spec for the on-device helper.
+# Regenerate the committed project with:  make helper-project
+name: IADBHelper
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    # iadb sets this to ".<teamid>" so every user gets their own bundle id
+    # (free Apple IDs cannot share bundle ids across teams).
+    IADB_BUNDLE_SUFFIX: ""
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+targets:
+  IADBRunner:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: IADBRunner
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.iadb.runner$(IADB_BUNDLE_SUFFIX)
+        PRODUCT_NAME: IADBRunner
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_OBJC_BRIDGING_HEADER: IADBRunner/IADBRunner-Bridging-Header.h
+        CLANG_ENABLE_OBJC_ARC: YES
+        ENABLE_TESTING_SEARCH_PATHS: YES
+schemes:
+  IADBRunner:
+    build:
+      targets:
+        IADBRunner: [test]
+    test:
+      targets:
+        - IADBRunner
