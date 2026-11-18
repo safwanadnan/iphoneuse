@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/safwanadnan/iphoneuse/internal/config"
 )
@@ -36,8 +37,9 @@ func Install() error {
 		return err
 	}
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-		// Homebrew upgrades replace the Cellar path; prefer the stable symlink.
-		if strings.Contains(resolved, "/Cellar/") {
+		// Homebrew upgrades replace the versioned Cellar/Caskroom path;
+		// point the service at the stable symlink instead.
+		if strings.Contains(resolved, "/Cellar/") || strings.Contains(resolved, "/Caskroom/") {
 			if _, err := os.Stat("/opt/homebrew/bin/iphoneuse"); err == nil {
 				exe = "/opt/homebrew/bin/iphoneuse"
 			} else if _, err := os.Stat("/usr/local/bin/iphoneuse"); err == nil {
@@ -70,10 +72,21 @@ func Install() error {
 		return err
 	}
 	exec.Command("/bin/launchctl", "bootout", domain()+"/"+Label).Run()
-	if out, err := exec.Command("/bin/launchctl", "bootstrap", domain(), PlistPath()).CombinedOutput(); err != nil {
-		return fmt.Errorf("launchctl bootstrap: %v: %s", err, strings.TrimSpace(string(out)))
+	// bootout returns before the old job is fully gone; loading again too
+	// soon fails with "Bootstrap failed: 5: Input/output error".
+	for i := 0; i < 50 && Loaded(); i++ {
+		time.Sleep(100 * time.Millisecond)
 	}
-	return nil
+	var lastErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		out, err := exec.Command("/bin/launchctl", "bootstrap", domain(), PlistPath()).CombinedOutput()
+		if err == nil {
+			return nil
+		}
+		lastErr = fmt.Errorf("launchctl bootstrap: %v: %s", err, strings.TrimSpace(string(out)))
+		time.Sleep(time.Second)
+	}
+	return lastErr
 }
 
 // Uninstall unloads and removes the launch agent.
