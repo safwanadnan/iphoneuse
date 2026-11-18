@@ -13,7 +13,9 @@ archives:
     files: [LICENSE, README.md]
 checksum:
   name_template: checksums.txt
-brews:
+# A cask (not a formula): Homebrew installs it without needing up-to-date
+# Command Line Tools, which are often stale right after a macOS upgrade.
+homebrew_casks:
   - name: iphoneuse
     repository:
       owner: safwanadnan
@@ -22,10 +24,15 @@ brews:
     homepage: https://github.com/safwanadnan/iphoneuse
     description: Computer use, for your iPhone - let Claude, ChatGPT and other AI agents use your iPhone
     license: MIT
-    install: |
-      bin.install "iphoneuse"
+    binaries: [iphoneuse]
     caveats: |
       Plug in your iPhone and run:
         iphoneuse setup
-    test: |
-      system "#{bin}/iphoneuse", "--version"
+    hooks:
+      post:
+        # The binary isn't notarized by Apple; drop the download quarantine
+        # so Gatekeeper doesn't block it.
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/iphoneuse"]
+          end
