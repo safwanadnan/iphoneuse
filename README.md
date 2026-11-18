@@ -180,6 +180,7 @@ make build                 # bin/iphoneuse
 make test
 make helper-project        # regenerate helper/iPhoneUseHelper.xcodeproj from project.yml (needs xcodegen)
 make helper-check          # compile the helper for the simulator
+make release               # after tagging vX.Y.Z: publish binaries + Homebrew formula
 ```
 
 The helper's Xcode project is generated from [`helper/project.yml`](helper/project.yml) and committed, so users never need XcodeGen.

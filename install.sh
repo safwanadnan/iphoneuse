@@ -2,6 +2,7 @@
 # iPhoneUse installer: downloads the latest release for this Mac and puts
 # `iphoneuse` on your PATH. Usage:
 #   curl -fsSL https://raw.githubusercontent.com/safwanadnan/iphoneuse/main/install.sh | sh
+# Set IPHONEUSE_INSTALL_DIR to choose where the binary goes.
 set -eu
 
 REPO="safwanadnan/iphoneuse"
@@ -31,7 +32,9 @@ curl -fsSL "$BASE/checksums.txt" -o "$TMP/checksums.txt"
 ( cd "$TMP" && grep " $FILE\$" checksums.txt | shasum -a 256 -c - >/dev/null ) || fail "checksum mismatch; not installing"
 tar -xzf "$TMP/$FILE" -C "$TMP"
 
-if [ -w /usr/local/bin ] || { [ ! -e /usr/local/bin ] && [ -w /usr/local ]; }; then
+if [ -n "${IPHONEUSE_INSTALL_DIR:-}" ]; then
+  DEST="$IPHONEUSE_INSTALL_DIR"
+elif [ -w /usr/local/bin ] || { [ ! -e /usr/local/bin ] && [ -w /usr/local ]; }; then
   DEST=/usr/local/bin
 else
   DEST="$HOME/.local/bin"
